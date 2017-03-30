@@ -4,6 +4,9 @@ var express = require("express");
 var bodyParser = require('body-parser');
 var WebSocket = require("ws");
 var cors = require("cors");
+var fs = require("fs");
+
+var blockchainFile = "/data/blockchain.json";
 
 var http_port = process.env.HTTP_PORT || 3001;
 var p2p_port = process.env.P2P_PORT || 6001;
@@ -118,6 +121,7 @@ var calculateHash = (index, previousHash, timestamp, data) => {
 var addBlock = (newBlock) => {
     if (isValidNewBlock(newBlock, getLatestBlock())) {
         blockchain.push(newBlock);
+        writeBlockchainToFile();
     }
 };
 
@@ -155,6 +159,7 @@ var handleBlockchainResponse = (message) => {
         if (latestBlockHeld.hash === latestBlockReceived.previousHash) {
             console.log("We can append the received block to our chain");
             blockchain.push(latestBlockReceived);
+            writeBlockchainToFile();
             broadcast(responseLatestMsg());
         } else if (receivedBlocks.length === 1) {
             console.log("We have to query the chain from our peer");
@@ -172,6 +177,7 @@ var replaceChain = (newBlocks) => {
     if (isValidChain(newBlocks) && newBlocks.length > blockchain.length) {
         console.log('Received blockchain is valid. Replacing current blockchain with received blockchain');
         blockchain = newBlocks;
+        writeBlockchainToFile();
         broadcast(responseLatestMsg());
     } else {
         console.log('Received blockchain invalid');
@@ -207,6 +213,27 @@ var responseLatestMsg = () => ({
 var write = (ws, message) => ws.send(JSON.stringify(message));
 var broadcast = (message) => sockets.forEach(socket => write(socket, message));
 
+var writeBlockchainToFile = () => {
+    fs.writeFile(blockchainFile, JSON.stringify(blockchain), function(err) {
+        if(err) {
+            return console.log(err);
+        }
+
+        console.log("Saved Chain to disk");
+    });
+}
+
+var readBlockchainFromFile = () => {
+    if (!fs.existsSync(blockchainFile)) {
+        return;
+    }
+    var fileContent = fs.readFileSync(blockchainFile);
+    var chain = JSON.parse(fileContent);
+    replaceChain(chain);
+}
+
+// Do this at startup
+readBlockchainFromFile();
 connectToPeers(initialPeers);
 initHttpServer();
 initP2PServer();

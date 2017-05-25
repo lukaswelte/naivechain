@@ -48,6 +48,17 @@ var initHttpServer = () => {
         console.log('block added: ' + JSON.stringify(newBlock));
         res.send();
     });
+    app.post('/mineBlocks', (req, res) => {
+        const body = req.body;
+        for (var i = 0; i < body.length; i++) {
+            const newBlock = generateNextBlock(body[i].data);
+            addBlock(newBlock);
+            broadcast(responseLatestMsg());
+            console.log('block added: ' + JSON.stringify(newBlock));
+        }
+
+        res.send();
+    });
     app.get('/peers', (req, res) => {
         res.send(sockets.map(s => s._socket.remoteAddress + ':' + s._socket.remotePort));
     });
